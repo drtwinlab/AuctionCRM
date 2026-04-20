@@ -5,8 +5,30 @@ import { sendNotification, requestNotificationPermission } from '../utils';
 export function useAuctions() {
   const [auctions, setAuctions] = useState<Auction[]>(() => {
     try {
+      // Try new key first
       const saved = localStorage.getItem('auction_crm_data_v2');
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed: Auction[] = JSON.parse(saved);
+        // Migrate: ensure all auctions have required fields
+        return parsed.map(a => ({
+          ...a,
+          category: a.category || 'other',
+          notified: a.notified ?? false,
+        }));
+      }
+      // Migrate from old key if exists
+      const oldSaved = localStorage.getItem('auction_crm_data');
+      if (oldSaved) {
+        const oldParsed = JSON.parse(oldSaved);
+        return oldParsed.map((a: any) => ({
+          ...a,
+          category: a.category || 'other',
+          finalPrice: a.finalPrice ?? undefined,
+          notified: false,
+          // remove old currentPrice field — not used anymore
+        }));
+      }
+      return [];
     } catch {
       return [];
     }

@@ -78,7 +78,7 @@ export const AuctionCard: React.FC<Props> = ({ auction, onUpdate, onDelete }) =>
               </a>
               <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 uppercase tracking-widest font-bold">
                 <Tag className="w-3 h-3" />
-                {CATEGORY_LABELS[auction.category] || 'Другое'}
+                {(auction.category && CATEGORY_LABELS[auction.category]) || 'Другое'}
               </span>
             </div>
           </div>
