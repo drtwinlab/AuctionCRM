@@ -1,32 +1,35 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, ListFilter, TrendingUp, Wallet, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, ListFilter, TrendingUp, CheckCircle2, Clock, Wallet } from 'lucide-react';
 import { useAuctions } from './hooks/useAuctions';
 import { AuctionForm } from './components/AuctionForm';
 import { AuctionCard } from './components/AuctionCard';
-import { formatCurrency } from './utils';
+import { formatCurrency, isEndingSoon } from './utils';
+import { AuctionCategory, CATEGORY_LABELS } from './types';
 
 export default function App() {
   const { auctions, addAuction, updateAuction, deleteAuction } = useAuctions();
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'won' | 'lost'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<AuctionCategory | 'all'>('all');
 
   const filteredAuctions = useMemo(() => {
     let sorted = [...auctions].sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
     if (filter !== 'all') {
       sorted = sorted.filter(a => filter === 'active' ? (a.status === 'active' || a.status === 'ended') : a.status === filter);
     }
+    if (categoryFilter !== 'all') {
+      sorted = sorted.filter(a => a.category === categoryFilter);
+    }
     return sorted;
-  }, [auctions, filter]);
+  }, [auctions, filter, categoryFilter]);
 
   const stats = useMemo(() => {
     const active = auctions.filter(a => a.status === 'active');
     const won = auctions.filter(a => a.status === 'won');
-    
-    const maxExposure = active.reduce((acc, curr) => acc + curr.maxPrice, 0);
-    const totalSpent = won.reduce((acc, curr) => acc + curr.currentPrice, 0);
-    const savings = won.reduce((acc, curr) => acc + (curr.maxPrice - curr.currentPrice), 0);
+    const endingSoonCount = active.filter(a => isEndingSoon(a.endDate, 24)).length;
+    const totalSpent = won.reduce((acc, curr) => acc + (curr.finalPrice ?? 0), 0);
 
-    return { activeCount: active.length, wonCount: won.length, maxExposure, totalSpent, savings };
+    return { activeCount: active.length, endingSoonCount, wonCount: won.length, totalSpent };
   }, [auctions]);
 
   return (
@@ -37,7 +40,7 @@ export default function App() {
           <div className="w-8 h-8 rounded bg-blue-500 flex items-center justify-center font-bold italic text-lg">
             A
           </div>
-          <h1 className="text-xl font-semibold tracking-tight text-white">AuctionPulse <span className="font-normal text-blue-400 hidden sm:inline">CRM</span></h1>
+          <h1 className="text-xl font-semibold tracking-tight text-white">AuctionPulse<span className="font-normal text-blue-400 hidden sm:inline"> CRM</span></h1>
         </div>
         
         <button
@@ -51,34 +54,34 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 w-full">
         {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
               <ListFilter className="w-3.5 h-3.5" />
-              <span>Активных лотов</span>
+              <span>Активных</span>
             </div>
             <div className="text-2xl font-black text-slate-900">{stats.activeCount}</div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              <Wallet className="w-3.5 h-3.5" />
-              <span>Потенц. затраты</span>
+              <Clock className="w-3.5 h-3.5" />
+              <span>Скоро (24ч)</span>
             </div>
-            <div className="text-2xl font-black text-blue-600">{formatCurrency(stats.maxExposure)}</div>
+            <div className={`text-2xl font-black ${stats.endingSoonCount > 0 ? 'text-amber-600' : 'text-slate-900'}`}>{stats.endingSoonCount}</div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Побед в торгах</span>
+              <span>Побед</span>
             </div>
             <div className="text-2xl font-black text-green-600">{stats.wonCount}</div>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Сэкономлено</span>
+              <Wallet className="w-3.5 h-3.5" />
+              <span>Потрачено</span>
             </div>
-            <div className="text-2xl font-black text-green-600">+{formatCurrency(stats.savings)}</div>
+            <div className="text-2xl font-black text-blue-600">{formatCurrency(stats.totalSpent)}</div>
           </div>
         </div>
 
@@ -91,25 +94,38 @@ export default function App() {
         )}
 
         {/* Filters */}
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 scrollbar-none">
-          {([
-            { id: 'all', label: 'Все лоты' },
-            { id: 'active', label: 'Активные' },
-            { id: 'won', label: 'Выигранные' },
-            { id: 'lost', label: 'Проигранные' }
-          ] as const).map(f => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors shadow-sm cursor-pointer ${
-                filter === f.id 
-                  ? 'bg-blue-50 text-blue-700 border border-blue-100' 
-                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {([
+              { id: 'all', label: 'Все лоты' },
+              { id: 'active', label: 'Активные' },
+              { id: 'won', label: 'Выигранные' },
+              { id: 'lost', label: 'Проигранные' }
+            ] as const).map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors shadow-sm cursor-pointer ${
+                  filter === f.id 
+                    ? 'bg-blue-50 text-blue-700 border border-blue-100' 
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as AuctionCategory | 'all')}
+            className="bg-white border border-slate-200 rounded-full px-4 py-1.5 text-sm font-medium text-slate-700 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 sm:ml-auto"
+          >
+            <option value="all">Все категории</option>
+            {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Empty State */}

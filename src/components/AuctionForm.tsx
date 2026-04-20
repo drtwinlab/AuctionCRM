@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, X } from 'lucide-react';
-import { Auction } from '../types';
+import { X, ImagePlus } from 'lucide-react';
+import { Auction, AuctionCategory, CATEGORY_LABELS } from '../types';
 
 interface Props {
-  onAdd: (auction: Omit<Auction, 'id' | 'createdAt' | 'status'>) => void;
+  onAdd: (auction: Omit<Auction, 'id' | 'createdAt' | 'status' | 'notified'>) => void;
   onClose: () => void;
 }
 
@@ -11,21 +11,25 @@ export function AuctionForm({ onAdd, onClose }: Props) {
   const [formData, setFormData] = useState({
     title: '',
     url: '',
-    currentPrice: '',
+    imageUrl: '',
     maxPrice: '',
     endDate: '',
+    category: 'other' as AuctionCategory,
     notes: ''
   });
+
+  const [showImagePreview, setShowImagePreview] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onAdd({
       title: formData.title,
       url: formData.url,
-      currentPrice: parseFloat(formData.currentPrice) || 0,
+      imageUrl: formData.imageUrl || undefined,
       maxPrice: parseFloat(formData.maxPrice) || 0,
       endDate: formData.endDate,
-      notes: formData.notes
+      category: formData.category,
+      notes: formData.notes || undefined,
     });
     onClose();
   };
@@ -34,10 +38,8 @@ export function AuctionForm({ onAdd, onClose }: Props) {
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm mb-8 overflow-hidden">
       <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            Новый лот
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Добавьте данные аукциона для отслеживания</p>
+          <h2 className="text-lg font-bold text-slate-800">Новый лот</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Добавьте лот для отслеживания</p>
         </div>
         <button 
           onClick={onClose}
@@ -58,7 +60,7 @@ export function AuctionForm({ onAdd, onClose }: Props) {
                 value={formData.title}
                 onChange={e => setFormData(p => ({...p, title: e.target.value}))}
                 className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-400"
-                placeholder="iPhone 15 Pro Max"
+                placeholder="Промышленный компрессор Atlas Copco"
               />
             </div>
 
@@ -70,39 +72,38 @@ export function AuctionForm({ onAdd, onClose }: Props) {
                 value={formData.url}
                 onChange={e => setFormData(p => ({...p, url: e.target.value}))}
                 className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-400"
-                placeholder="https://ebay.com/item/..."
+                placeholder="https://troostwijkauctions.com/lot/..."
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Текущая цена (€)</label>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Мой лимит (€)</label>
               <input
                 required
                 type="number"
                 min="0"
-                step="0.01"
-                value={formData.currentPrice}
-                onChange={e => setFormData(p => ({...p, currentPrice: e.target.value}))}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-400"
-                placeholder="1000"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Мой лимит - Макс. цена (€)</label>
-              <input
-                required
-                type="number"
-                min="0"
-                step="0.01"
+                step="1"
                 value={formData.maxPrice}
                 onChange={e => setFormData(p => ({...p, maxPrice: e.target.value}))}
                 className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-400"
                 placeholder="5000"
               />
             </div>
-            
-            <div className="md:col-span-2">
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Категория</label>
+              <select
+                value={formData.category}
+                onChange={e => setFormData(p => ({...p, category: e.target.value as AuctionCategory}))}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              >
+                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Дата и время окончания</label>
               <input
                 required
@@ -110,6 +111,44 @@ export function AuctionForm({ onAdd, onClose }: Props) {
                 value={formData.endDate}
                 onChange={e => setFormData(p => ({...p, endDate: e.target.value}))}
                 className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                <ImagePlus className="w-3 h-3" />
+                Фото (URL)
+              </label>
+              <input
+                type="url"
+                value={formData.imageUrl}
+                onChange={e => {
+                  setFormData(p => ({...p, imageUrl: e.target.value}));
+                  setShowImagePreview(!!e.target.value);
+                }}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-400"
+                placeholder="https://...image.jpg (необязательно)"
+              />
+              {showImagePreview && formData.imageUrl && (
+                <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 h-20 w-20">
+                  <img 
+                    src={formData.imageUrl} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover"
+                    onError={() => setShowImagePreview(false)}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">Заметки</label>
+              <textarea
+                value={formData.notes}
+                onChange={e => setFormData(p => ({...p, notes: e.target.value}))}
+                rows={2}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-400 resize-none"
+                placeholder="Без блока питания, царапина на корпусе..."
               />
             </div>
           </div>
