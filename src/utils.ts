@@ -36,3 +36,20 @@ export const formatTimeLeft = (ms: number) => {
   
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
+
+export const isEndingSoon = (endDate: string, hoursThreshold = 24) => {
+  const timeLeft = calculateTimeLeft(endDate);
+  return timeLeft > 0 && timeLeft <= hoursThreshold * 60 * 60 * 1000;
+};
+
+export const requestNotificationPermission = async () => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+};
+
+export const sendNotification = (title: string, body: string) => {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, { body, icon: '⚡' });
+  }
+};

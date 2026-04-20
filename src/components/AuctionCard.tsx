@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Auction } from '../types';
-import { cn, formatCurrency, getDomain, calculateTimeLeft, formatTimeLeft } from '../utils';
-import { ExternalLink, Edit2, Trash2, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Auction, CATEGORY_LABELS } from '../types';
+import { cn, formatCurrency, getDomain, calculateTimeLeft, formatTimeLeft, isEndingSoon } from '../utils';
+import { ExternalLink, Trash2, Clock, AlertCircle, Tag, StickyNote, DollarSign } from 'lucide-react';
 
 interface Props {
   auction: Auction;
@@ -11,8 +11,8 @@ interface Props {
 
 export const AuctionCard: React.FC<Props> = ({ auction, onUpdate, onDelete }) => {
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft(auction.endDate));
-  const [isEditingPrice, setIsEditingPrice] = useState(false);
-  const [newPrice, setNewPrice] = useState(auction.currentPrice.toString());
+  const [isEditingFinalPrice, setIsEditingFinalPrice] = useState(false);
+  const [finalPrice, setFinalPrice] = useState(auction.finalPrice?.toString() || '');
 
   useEffect(() => {
     if (auction.status !== 'active') return;
@@ -28,136 +28,155 @@ export const AuctionCard: React.FC<Props> = ({ auction, onUpdate, onDelete }) =>
     return () => clearInterval(timer);
   }, [auction.endDate, auction.status, auction.id, onUpdate]);
 
-  const handleUpdatePrice = () => {
-    const val = parseFloat(newPrice);
-    if (!isNaN(val)) {
-      onUpdate(auction.id, { currentPrice: val });
+  const handleSaveFinalPrice = () => {
+    const val = parseFloat(finalPrice);
+    if (!isNaN(val) && val >= 0) {
+      onUpdate(auction.id, { finalPrice: val });
     }
-    setIsEditingPrice(false);
+    setIsEditingFinalPrice(false);
   };
 
-  const priceRatio = auction.currentPrice / auction.maxPrice;
-  const isDanger = priceRatio >= 1;
-  const isWarning = priceRatio > 0.8 && !isDanger;
+  const endingSoon = isEndingSoon(auction.endDate, 24);
 
   return (
     <div className={cn(
       "auction-card bg-white border rounded-xl flex flex-col relative overflow-hidden transition-all",
       auction.status === 'won' ? "border-green-500 shadow-md shadow-green-100" :
-      auction.status === 'lost' ? "border-slate-300 opacity-80" :
-      isDanger ? "border-red-300 shadow-sm shadow-red-100" : "border-slate-200 shadow-sm"
+      auction.status === 'lost' ? "border-slate-300 opacity-70" :
+      endingSoon ? "border-amber-300 shadow-sm shadow-amber-50" : "border-slate-200 shadow-sm"
     )}>
+
+      {/* Image */}
+      {auction.imageUrl && (
+        <div className="h-40 w-full bg-slate-100 overflow-hidden">
+          <img 
+            src={auction.imageUrl} 
+            alt={auction.title}
+            className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        </div>
+      )}
       
-      <div className="p-5 flex flex-col gap-5 flex-1">
+      <div className="p-5 flex flex-col gap-4 flex-1">
         
-        {/* Header content inline */}
-        <div className="flex justify-between items-start gap-4">
+        {/* Header */}
+        <div className="flex justify-between items-start gap-3">
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-slate-800 pr-2 truncate text-lg" title={auction.title}>
+            <h3 className="font-bold text-slate-800 pr-2 text-lg leading-tight" title={auction.title}>
               {auction.title}
             </h3>
-            <a
-              href={auction.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-[10px] text-blue-500 uppercase tracking-widest font-bold hover:underline mt-1"
-            >
-              <span className="truncate">Открыть лот →</span>
-            </a>
+            <div className="flex items-center gap-3 mt-1.5">
+              <a
+                href={auction.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] text-blue-500 uppercase tracking-widest font-bold hover:underline"
+              >
+                <ExternalLink className="w-3 h-3" />
+                {getDomain(auction.url)}
+              </a>
+              <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                <Tag className="w-3 h-3" />
+                {CATEGORY_LABELS[auction.category] || 'Другое'}
+              </span>
+            </div>
           </div>
           
-          <div className="shrink-0 flex gap-2">
-            {auction.status === 'active' && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-blue-50 text-blue-700 border border-blue-100 shadow-sm">
+          <div className="shrink-0">
+            {auction.status === 'active' && !endingSoon && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-blue-50 text-blue-700 border border-blue-100">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
                 Live
               </span>
             )}
+            {auction.status === 'active' && endingSoon && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                <AlertCircle className="w-3 h-3" />
+                Скоро!
+              </span>
+            )}
             {auction.status === 'ended' && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-slate-100 text-slate-600 border border-slate-200 shadow-sm">
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-slate-100 text-slate-600 border border-slate-200">
                 Завершен
               </span>
             )}
             {auction.status === 'won' && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-green-50 text-green-700 border border-green-200 shadow-sm">
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-green-50 text-green-700 border border-green-200">
                 Победа
               </span>
             )}
             {auction.status === 'lost' && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-red-50 text-red-700 border border-red-200 shadow-sm">
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold bg-red-50 text-red-700 border border-red-200">
                 Упущен
               </span>
             )}
           </div>
         </div>
 
-        {/* Prices and Timer layout */}
+        {/* Limit and Timer */}
         <div className="flex justify-between items-end">
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 whitespace-nowrap">
-              Тек. ставка
+            <span className="text-[10px] uppercase font-bold text-slate-400 mb-0.5">
+              Мой лимит
             </span>
-            {isEditingPrice ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
-                  className="w-24 bg-white border border-slate-300 rounded px-2 py-1 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus
-                  onBlur={handleUpdatePrice}
-                  onKeyDown={(e) => e.key === 'Enter' && handleUpdatePrice()}
-                />
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 group cursor-pointer" onClick={() => auction.status === 'active' && setIsEditingPrice(true)}>
-                <span className={cn(
-                  "text-2xl tracking-tight font-black",
-                  isDanger ? "text-red-600" : "text-slate-900"
-                )}>
-                  {formatCurrency(auction.currentPrice)}
-                </span>
-                {auction.status === 'active' && (
-                  <p className="text-slate-300 group-hover:text-blue-500 transition-colors p-1 opacity-0 group-hover:opacity-100">
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </p>
-                )}
-              </div>
-            )}
+            <span className="text-2xl tracking-tight font-black text-slate-900">
+              {formatCurrency(auction.maxPrice)}
+            </span>
           </div>
 
           <div className="flex flex-col items-end text-right">
-            <span className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 whitespace-nowrap flex items-center gap-1">
-              {isDanger && <AlertCircle className="w-3 h-3 text-red-500" />}
-              Осталось времени
+            <span className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {timeLeft > 0 ? 'Осталось' : 'Время'}
             </span>
             <span className={cn(
               "text-sm",
-              timeLeft <= 3600000 && timeLeft > 0 ? "font-bold text-red-500 animate-pulse timer-urgent" : "font-medium text-slate-600",
-              timeLeft <= 0 && "text-slate-500"
+              timeLeft <= 3600000 && timeLeft > 0 ? "font-bold text-red-500 animate-pulse" : "font-medium text-slate-600",
+              timeLeft <= 0 && "text-slate-400"
             )}>
                {formatTimeLeft(timeLeft)}
             </span>
           </div>
         </div>
 
-        {/* Progress bar area */}
-        <div className="mt-1">
-          <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1.5 tracking-wider">
-            <span>ПРОГРЕСС БЮДЖЕТА</span>
-            <span>{formatCurrency(auction.maxPrice)} (MAX)</span>
+        {/* Final price for won auctions */}
+        {auction.status === 'won' && (
+          <div className="bg-green-50 border border-green-100 rounded-lg p-3 flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold text-green-600 tracking-widest flex items-center gap-1">
+              <DollarSign className="w-3 h-3" />
+              Итоговая цена
+            </span>
+            {isEditingFinalPrice ? (
+              <input
+                type="number"
+                value={finalPrice}
+                onChange={(e) => setFinalPrice(e.target.value)}
+                className="w-28 bg-white border border-green-300 rounded px-2 py-1 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-green-500 text-right"
+                autoFocus
+                placeholder="0"
+                onBlur={handleSaveFinalPrice}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveFinalPrice()}
+              />
+            ) : (
+              <span 
+                className="text-lg font-black text-green-700 cursor-pointer hover:underline"
+                onClick={() => setIsEditingFinalPrice(true)}
+                title="Нажмите чтобы изменить"
+              >
+                {auction.finalPrice != null ? formatCurrency(auction.finalPrice) : 'Указать →'}
+              </span>
+            )}
           </div>
-          <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-            <div 
-              className={cn(
-                "h-full transition-all duration-500 relative",
-                isDanger ? "bg-red-500" :
-                isWarning ? "bg-yellow-500" : "bg-blue-500"
-              )}
-              style={{ width: `${Math.min(priceRatio * 100, 100)}%` }}
-            />
+        )}
+
+        {/* Notes */}
+        {auction.notes && (
+          <div className="flex items-start gap-1.5 text-xs text-slate-500">
+            <StickyNote className="w-3 h-3 mt-0.5 shrink-0" />
+            <span className="line-clamp-2">{auction.notes}</span>
           </div>
-        </div>
+        )}
 
       </div>
 
@@ -180,24 +199,25 @@ export const AuctionCard: React.FC<Props> = ({ auction, onUpdate, onDelete }) =>
               </button>
             </>
           ) : (
-            <span className={cn(
-              "text-[10px] font-bold uppercase tracking-widest",
-              isDanger || auction.status === 'lost' ? "text-red-600" : 
-              auction.status === 'won' ? "text-green-600" : "text-blue-600"
-            )}>
-              {auction.status === 'active' ? (isDanger ? 'ПРЕВЫШЕН ЛИМИТ' : 'В ПРЕДЕЛАХ ЛИМИТА') : 
-               auction.status === 'won' ? 'ЛОТ ВАШ' : 'ТОРГИ ОКОНЧЕНЫ'}
-            </span>
+            <a
+              href={auction.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors rounded shadow-sm border border-blue-100 cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Открыть лот
+            </a>
           )}
         </div>
         
         <div className="flex items-center gap-3 ml-auto">
           {(auction.status === 'won' || auction.status === 'lost') && (
             <button
-              onClick={() => onUpdate(auction.id, { status: 'active' })}
+              onClick={() => onUpdate(auction.id, { status: 'active', finalPrice: undefined })}
               className="text-[10px] uppercase font-bold text-slate-400 hover:text-slate-700 hover:underline transition-colors cursor-pointer tracking-widest"
             >
-               В Live
+              Вернуть в Live
             </button>
           )}
           <button
